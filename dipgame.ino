@@ -21,15 +21,12 @@ enum state {
   incorrect
 };
 
-// Game states
-String questions[] = {"1+1 = 2?", "asdfasf"};
-const int totalQuestions = 2;
-int questionNum = 0;
-
 // Question answers
-bool question1[] = {true, true, true, true};
-bool question2[] = {true, false, true, false};
-bool question3[] = {false, true, true, true};
+String questions[][2] = {{"(85-5-2)/6 = ___?", "Express in binary."}, {"NTUDIP = UTIPND", "123432 = ________?"}};
+bool coverAnswers[] = {true, true, false, true};
+int totalQuestions = 2;
+int coverQuestions = 1;
+int questionNum = 0;
 
 
 // Constants for time
@@ -47,9 +44,9 @@ int player3 = A4;
 int player4 = A2;
 
 // User input for FSM type games
-int userInput[4];
+int userInput[6];
 int registered = 0;
-int order1[] = {1,2,3,4};
+int orderAnswers[] = {3,2,3,2,1,4};
 bool needsReset = false;
 
 bool sameAnswer() {
@@ -135,21 +132,33 @@ void setup() {
   lcd.clear();
   lcd.display();
   lcd.print("test");
-  currentState = orderQuestion;
+  currentState = asking;
+}
+
+void lcdPrintLines(String lines[]){
+  for (int i =0; i < sizeof(lines); i++) {
+    lcd.setCursor(0, i);
+    lcd.print(lines[i]);
+  }
 }
 
 void loop() {
   if (currentState == asking) {
     Serial.println("Asking");
     lcd.clear();
-    String question = questions[questionNum];
-    lcd.setCursor(0, 0);
-    lcd.print(question);
-    currentState = waiting;
+    String question[2] = questions[questionNum];
+    lcdPrintLines(question);
+    if (questionNum >= totalQuestions) {
+      currentState = finished;
+    } else if (questionNum < coverQuestions) {
+       currentState = waiting; 
+    } else {
+      currentState = orderQuestion;
+    }
     currentTime = timePerRound; 
   }
   else if (currentState == waiting) {
-    lcd.setCursor(9, 2);
+    lcd.setCursor(9, 4);
     currentTime = currentTime-1;
     if (currentTime == 0) {
       currentState = displaying;
@@ -158,7 +167,6 @@ void loop() {
     delay(1000);
   }
   else if (currentState == finished) {
-    Serial.println("YAY");
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Finished!");
@@ -173,20 +181,19 @@ void loop() {
       currentState = finished;
     }
     delay(2000);
-    currentState = orderQuestion;
+    currentState = asking;
   }
   else if(currentState == incorrect){
     lcd.clear();
     lcd.print("Incorrect!");
-    questionNum = 0;
     playFailure();
     delay(2000);
-    currentState = orderQuestion;
+    currentState = asking;
   }
   else if(currentState == orderQuestion){
     // Checks if the sequence has been pressed
-    if (registered == 4){
-      bool isSame = compareArrays(userInput, order1);
+    if (registered == 6){
+      bool isSame = compareArrays(userInput, orderAnswers);
       Serial.println(isSame);
       if (isSame){
         currentState = correct;
@@ -213,7 +220,7 @@ void loop() {
   }
   else if (currentState == displaying) {
     Serial.println("Displaying");
-    boolean isSame = verifyPlayer(question2);
+    boolean isSame = verifyPlayer(coverAnswers);
     Serial.println(isSame);
     lcd.clear();
     lcd.setCursor(0,0);
