@@ -1,3 +1,7 @@
+/*
+ * DIP AY2017/2018 Sem 2 E004 Subgroup game - 'Question Game'
+ */
+
 #include <LiquidCrystal.h>
 
 // LCD Display constants
@@ -14,7 +18,7 @@ const int speakerPin = 8;
 enum state {
   asking,
   waiting,
-  displaying,
+  verifying,
   finished,
   orderQuestion,
   correct,
@@ -49,12 +53,14 @@ int registered = 0;
 int orderAnswers[] = {3,2,3,2,1,4};
 bool needsReset = false;
 
-bool sameAnswer() {
-  bool player1Input = analogRead(player1) > 500;
-  bool player2Input = analogRead(player2) > 500;
-  return (player1Input && player2Input) || (not player1Input && not player2Input);
-}
-
+/*
+ * This function verifies whether or not the sensors being triggered match an expected array of inputs. 
+ * For example, if the desired output is for player 1 and 3 to cover their sensors, but only player 1 is covering their sensor, the function will return False.
+ * 
+ * @param bool playersToVerify[] An array of booleans to signify which sensors should be covered in order from player 1 to player 4
+ * 
+ * @return True if the correct players are covering their sensors, and false otherwise
+ */
 bool verifyPlayer(bool playersToVerify[]) {
   // Check which players have inputted their answer
   bool player1Input = analogRead(player1) > 700;
@@ -63,18 +69,20 @@ bool verifyPlayer(bool playersToVerify[]) {
   bool player4Input = analogRead(player4) > 700;
   bool inputs[] = {player1Input, player2Input, player3Input, player4Input};
 
-  for (int i = 0; i < 4; i++) {
-    if (inputs[i] != playersToVerify[i]) {
-      return false;
-    }
-  }
-  return true;   
+  // Compares the input array to the verification set
+  return compareArrays(inputs, playersToVerify);   
 }
 
+/*
+ * Compares two arrays for element-wise equality.
+ * 
+ * @param int first[]  First array to compare.
+ * @param int second[] Second array to compare.
+ * 
+ * @return True if the arrays have the same values, false otherwise.
+ */
 bool compareArrays(int first[], int second[]) {
   for (int i = 0; i < sizeof(first); i++){
-    Serial.println(first[i]);
-    Serial.println(second[i]);
     if (first[i]!=second[i]){
       return false;
     }
@@ -82,6 +90,12 @@ bool compareArrays(int first[], int second[]) {
   return true;
 }
 
+/*
+ * Determines which single player is inputting a value by checking if one sensor is covered and the rest are not.
+ * 
+ * @return -2 if none of the inputs are being covered, -1 if an invalid value is returned, 
+ *         and a number from {1,2,3,4} otherwise signifying which user is providing input.
+ */
 int getPlayerInput(){
   bool player1Input = analogRead(player1) > 700;
   bool player2Input = analogRead(player2) > 700;
@@ -96,11 +110,14 @@ int getPlayerInput(){
   } else if (player4Input && not (player1Input || player2Input || player3Input)) {
     return 4;
   } else if (not(player1Input || player2Input || player3Input || player4Input)) {
-    return 5;
+    return -2;
   }
   return -1;
 }
 
+/*
+ * Plays a sound for success as well as lighting up the pin with the correct LED.
+ */
 void playSuccess() {
   digitalWrite(correctPin, HIGH);
   for (int i = 0; i < 3; i+=1) {
@@ -112,6 +129,10 @@ void playSuccess() {
   digitalWrite(correctPin, LOW);
 }
 
+
+/*
+ * Plays a sound for failure as well as lighting up the pin with the correct LED.
+ */
 void playFailure() {
   digitalWrite(incorrectPin, HIGH);
   digitalWrite(speakerPin, HIGH);
@@ -121,20 +142,11 @@ void playFailure() {
   digitalWrite(incorrectPin, LOW);
 }
 
-void setup() {
-  pinMode(laserPin, OUTPUT);
-  Serial.begin(9600);
-
-  pinMode(speakerPin, OUTPUT);
-  pinMode(correctPin, OUTPUT);
-  pinMode(incorrectPin, OUTPUT);
-  lcd.begin(20, 4);
-  lcd.clear();
-  lcd.display();
-  lcd.print("test");
-  currentState = asking;
-}
-
+/*
+ * Prints multiple lines on the LCD screen.
+ * 
+ * @param lines[] a 2D string array of the lines to print.
+ */
 void lcdPrintLines(String lines[]){
   for (int i =0; i < sizeof(lines); i++) {
     lcd.setCursor(0, i);
@@ -142,6 +154,25 @@ void lcdPrintLines(String lines[]){
   }
 }
 
+void setup() {
+  Serial.begin(9600);
+
+  // Initialize pins for output
+  pinMode(laserPin, OUTPUT);
+  pinMode(speakerPin, OUTPUT);
+  pinMode(correctPin, OUTPUT);
+  pinMode(incorrectPin, OUTPUT);
+  //Initialize LCD
+  lcd.begin(20, 4);
+  lcd.clear();
+  lcd.display();
+  lcd.print("test");
+  currentState = asking;
+}
+
+/*
+ * Main loop of the game. The game functions as an FSM with 8 states
+ */
 void loop() {
   if (currentState == asking) {
     Serial.println("Asking");
@@ -161,7 +192,7 @@ void loop() {
     lcd.setCursor(9, 4);
     currentTime = currentTime-1;
     if (currentTime == 0) {
-      currentState = displaying;
+      currentState = verifying;
     }
     lcd.print(currentTime); 
     delay(1000);
@@ -203,7 +234,7 @@ void loop() {
       registered = 0;
     } else 
     if (needsReset){
-      if (getPlayerInput() == 5){
+      if (getPlayerInput() == -2){
         needsReset = false;
       }
     } else {
@@ -218,8 +249,8 @@ void loop() {
     }
     delay(100);
   }
-  else if (currentState == displaying) {
-    Serial.println("Displaying");
+  else if (currentState == verifying) {
+    Serial.println("verifying");
     boolean isSame = verifyPlayer(coverAnswers);
     Serial.println(isSame);
     lcd.clear();
