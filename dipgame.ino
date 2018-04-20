@@ -9,8 +9,7 @@ const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // Initialize pin numbers
-const int laserPin = 10;
-const int correctPin = 6;
+const int outputPin = 10;
 const int incorrectPin = 7;
 const int speakerPin = 8;
 
@@ -26,32 +25,39 @@ enum state {
 };
 
 // Question answers
-String questions[][2] = {{"(85-5-2)/6 = ___?", "Express in binary."}, {"NTUDIP = UTIPND", "123432 = ________?"}};
+String questions[][3] = 
+{{"(85-5-2)/6 = ___?", "Express in binary.", ""},
+{"1011 + 1000 = 1000","1101 + 0110 = 1110", "1100 + 0011 = ?"},
+{"How many 5s are", "there between 1 and ", "100?"},
+{"NTUDIP = UTIPND", "123432 = ________?", ""}};
 bool coverAnswers[] = {true, true, false, true};
-int totalQuestions = 2;
-int coverQuestions = 1;
+bool coverAnswers2[] = {true, true, true, true};
+bool coverAnswers3[] = {true, false, true, false};
+int totalQuestions = 4;
+int coverQuestions = 3;
 int questionNum = 0;
 
 
 // Constants for time
-const int timePerRound = 10;
+const int timePerRound = 30;
 const float timerInterval = 1000;
-int currentTime = 10;
+int currentTime = 30;
 
 // Initialize current state
-state currentState = orderQuestion;
+state currentState = asking;
 
 // Initialize player 1
-int player1 = A5;
+int player1 = A1;
 int player2 = A3;
-int player3 = A4;
-int player4 = A2;
+int player3 = A2;
+int player4 = A4;
 
 // User input for FSM type games
 int userInput[6];
 int registered = 0;
 int orderAnswers[] = {3,2,3,2,1,4};
 bool needsReset = false;
+int lineOrder[] = {0,1,2,3};
 
 /*
  * This function verifies whether or not the sensors being triggered match an expected array of inputs. 
@@ -63,14 +69,24 @@ bool needsReset = false;
  */
 bool verifyPlayer(bool playersToVerify[]) {
   // Check which players have inputted their answer
-  bool player1Input = analogRead(player1) > 700;
+  bool player1Input = analogRead(player1) > 500;
   bool player2Input = analogRead(player2) > 700;
   bool player3Input = analogRead(player3) > 700;
   bool player4Input = analogRead(player4) > 700;
   bool inputs[] = {player1Input, player2Input, player3Input, player4Input};
 
   // Compares the input array to the verification set
-  return compareArrays(inputs, playersToVerify);   
+  return compareBoolArrays(inputs, playersToVerify);   
+}
+
+
+bool compareBoolArrays(bool first[], bool second[]) {
+  for (int i = 0; i < sizeof(first); i++){
+    if (first[i]!=second[i]){
+      return false;
+    }
+  }
+  return true;
 }
 
 /*
@@ -82,7 +98,7 @@ bool verifyPlayer(bool playersToVerify[]) {
  * @return True if the arrays have the same values, false otherwise.
  */
 bool compareArrays(int first[], int second[]) {
-  for (int i = 0; i < sizeof(first); i++){
+  for (int i = 0; i < 6; i++){
     if (first[i]!=second[i]){
       return false;
     }
@@ -97,7 +113,7 @@ bool compareArrays(int first[], int second[]) {
  *         and a number from {1,2,3,4} otherwise signifying which user is providing input.
  */
 int getPlayerInput(){
-  bool player1Input = analogRead(player1) > 700;
+  bool player1Input = analogRead(player1) > 500;
   bool player2Input = analogRead(player2) > 700;
   bool player3Input = analogRead(player3) > 700;
   bool player4Input = analogRead(player4) > 700;
@@ -119,14 +135,12 @@ int getPlayerInput(){
  * Plays a sound for success as well as lighting up the pin with the correct LED.
  */
 void playSuccess() {
-  digitalWrite(correctPin, HIGH);
   for (int i = 0; i < 3; i+=1) {
     digitalWrite(speakerPin, HIGH);
     delay(100);
     digitalWrite(speakerPin, LOW);
     delay(500);
   }
-  digitalWrite(correctPin, LOW);
 }
 
 
@@ -148,19 +162,23 @@ void playFailure() {
  * @param lines[] a 2D string array of the lines to print.
  */
 void lcdPrintLines(String lines[]){
-  for (int i =0; i < sizeof(lines); i++) {
+//  for (int i =0; i < sizeof(line; i++) {
+//    lcd.setCursor(0, i);
+
+//  }
+  for (int i =0; i < 3; i++) {
     lcd.setCursor(0, i);
-    lcd.print(lines[i]);
-  }
+    lcd.print(lines[i]);  
+    }
 }
 
 void setup() {
   Serial.begin(9600);
 
   // Initialize pins for output
-  pinMode(laserPin, OUTPUT);
   pinMode(speakerPin, OUTPUT);
-  pinMode(correctPin, OUTPUT);
+  pinMode(outputPin, OUTPUT);
+  digitalWrite(outputPin, LOW);
   pinMode(incorrectPin, OUTPUT);
   //Initialize LCD
   lcd.begin(20, 4);
@@ -174,10 +192,18 @@ void setup() {
  * Main loop of the game. The game functions as an FSM with 8 states
  */
 void loop() {
+  Serial.print("p1: ");
+  Serial.print(analogRead(player1));
+   Serial.print("p2: ");
+  Serial.print(analogRead(player2));
+  Serial.print("p3: ");
+  Serial.print(analogRead(player3));
+  Serial.print("p4: ");
+  Serial.println(analogRead(player4));
   if (currentState == asking) {
     Serial.println("Asking");
     lcd.clear();
-    String question[2] = questions[questionNum];
+    String question[3] = questions[questionNum];
     lcdPrintLines(question);
     if (questionNum >= totalQuestions) {
       currentState = finished;
@@ -186,9 +212,25 @@ void loop() {
     } else {
       currentState = orderQuestion;
     }
+    if (questionNum == 1) {
+      currentTime = 30;
+    } else {
     currentTime = timePerRound; 
+    }
   }
   else if (currentState == waiting) {
+  int player1Input = analogRead(player1) > 500;
+  int player2Input = analogRead(player2) > 700;
+  int player3Input = analogRead(player3) > 700;
+  int player4Input = analogRead(player4) > 700;
+  lcd.setCursor(0, 3);
+  lcd.print(player1Input);
+  lcd.print(player2Input);
+  lcd.print(player3Input);
+  lcd.print(player4Input);
+ 
+    lcd.setCursor(9, 4);
+    lcd.print("     ");
     lcd.setCursor(9, 4);
     currentTime = currentTime-1;
     if (currentTime == 0) {
@@ -200,8 +242,11 @@ void loop() {
   else if (currentState == finished) {
     lcd.clear();
     lcd.setCursor(0,0);
-    lcd.print("Finished!");
-    delay(2000);
+    lcd.print("Congratulations!");
+    digitalWrite(outputPin, HIGH);
+    delay(60000);
+    currentState = asking;
+    questionNum = 0;
   }
   else if(currentState == correct){
     lcd.clear();
@@ -233,7 +278,7 @@ void loop() {
       }
       registered = 0;
     } else 
-    if (needsReset){
+    if (needsReset){  
       if (getPlayerInput() == -2){
         needsReset = false;
       }
@@ -251,7 +296,14 @@ void loop() {
   }
   else if (currentState == verifying) {
     Serial.println("verifying");
-    boolean isSame = verifyPlayer(coverAnswers);
+    boolean isSame;
+    if (questionNum == 0) {
+      isSame = verifyPlayer(coverAnswers);
+    } else if (questionNum == 1) {
+      isSame = verifyPlayer(coverAnswers2);      
+    } else {
+      isSame = verifyPlayer(coverAnswers3);
+    }
     Serial.println(isSame);
     lcd.clear();
     lcd.setCursor(0,0);
@@ -262,6 +314,9 @@ void loop() {
       currentState = incorrect;
     }
     delay(50);
+  }
+  if (currentState != finished) {
+         digitalWrite(outputPin, LOW);
   }
 }
 
