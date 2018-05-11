@@ -32,10 +32,11 @@ String questions[][3] =
 {"NTUDIP = UTIPND", "123432 = ________?", ""}};
 bool coverAnswers[] = {true, true, false, true};
 bool coverAnswers2[] = {true, true, true, true};
-bool coverAnswers3[] = {true, false, true, false};
+bool coverAnswers3[] = {true, false, true, true};
 int totalQuestions = 4;
 int coverQuestions = 3;
 int questionNum = 0;
+bool started = false;
 
 
 // Constants for time
@@ -200,7 +201,19 @@ void loop() {
   Serial.print(analogRead(player3));
   Serial.print("p4: ");
   Serial.println(analogRead(player4));
-  if (currentState == asking) {
+  if (started == false) {
+    lcd.clear();
+    lcd.print("Press any button to start");
+    bool player1Input = analogRead(player1) > 500;
+    bool player2Input = analogRead(player2) > 700;
+    bool player3Input = analogRead(player3) > 700;
+    bool player4Input = analogRead(player4) > 700;
+    if (player1Input || player2Input || player3Input || player4Input) {
+      started = true;
+    }
+    Serial.println("test");
+  }
+  else if (currentState == asking) {
     Serial.println("Asking");
     lcd.clear();
     String question[3] = questions[questionNum];
@@ -246,6 +259,7 @@ void loop() {
     digitalWrite(outputPin, HIGH);
     delay(60000);
     currentState = asking;
+    started = false;
     questionNum = 0;
   }
   else if(currentState == correct){
@@ -316,7 +330,8 @@ void loop() {
     delay(50);
   }
   if (currentState != finished) {
-         digitalWrite(outputPin, LOW);
+    digitalWrite(outputPin, LOW);
+         
   }
 }
 
